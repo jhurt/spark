@@ -21,7 +21,7 @@ import java.net.{URLClassLoader, URL}
 import java.util.Enumeration
 import java.util.concurrent.ConcurrentHashMap
 
-import scala.collection.JavaConversions._
+import scala.collection.mutable
 
 /**
  * URL class loader that exposes the `addURL` and `getURLs` methods in URLClassLoader.
@@ -57,6 +57,8 @@ private[spark] class ChildFirstURLClassLoader(urls: Array[URL], parent: ClassLoa
    */
   private val locks = new ConcurrentHashMap[String, Object]()
 
+  private val classes = new mutable.HashMap[String, Class[_]]()
+
   override def loadClass(name: String, resolve: Boolean): Class[_] = {
     var lock = locks.get(name)
     if (lock == null) {
@@ -67,12 +69,22 @@ private[spark] class ChildFirstURLClassLoader(urls: Array[URL], parent: ClassLoa
       }
     }
 
+    def parentLoadClass: Class[_] = {
+      val clazz: Class[_] = parentClassLoader.loadClass(name, resolve)
+      classes.put(name, clazz)
+      clazz
+    }
+
     lock.synchronized {
       try {
-        super.loadClass(name, resolve)
+        if (classes.contains(name)) {
+          return classes.get(name).get
+        }
+        val clazz: Class[_] = super.loadClass(name, resolve)
+        classes.put(name, clazz)
+        clazz
       } catch {
-        case e: ClassNotFoundException =>
-          parentClassLoader.loadClass(name, resolve)
+        case e: ClassNotFoundException => parentLoadClass
       }
     }
   }
