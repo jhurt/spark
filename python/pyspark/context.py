@@ -792,6 +792,14 @@ class SparkContext(object):
         """
         return self._jsc.getLocalProperty(key)
 
+    def setHadoopConfigurationProperty(self, key, value):
+        """
+        Set a property on this context's org.apache.hadoop.conf.Configuration instance
+        :param key: The name of the property to set.
+        :param value: The string value of the property.
+        """
+        self._jsc.hadoopConfiguration().set(key, value)
+
     def sparkUser(self):
         """
         Get SPARK_USER for user who is running SparkContext.
